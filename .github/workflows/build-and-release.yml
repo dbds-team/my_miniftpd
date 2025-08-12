@@ -97,22 +97,20 @@ jobs:
     - name: Create checksums
       run: |
         cd artifacts
-        for dir in */; do
-          if [ -d "$dir" ]; then
-            cd "$dir"
-            for file in *; do
-              if [ -f "$file" ]; then
-                sha256sum "$file" > "$file.sha256"
-                mv "$file" "$file.sha256" ../
-              fi
-            done
-            cd ..
+        # Move all files from subdirectories to current directory
+        find . -name "miniftpd-*" -type f -exec mv {} . \;
+        # Remove empty subdirectories
+        find . -type d -empty -delete
+        # Create checksums for all binary files
+        for file in miniftpd-*; do
+          if [ -f "$file" ]; then
+            sha256sum "$file" > "$file.sha256"
           fi
         done
         cd ..
-        mv artifacts/* .
-        rmdir artifacts/*/
-        rmdir artifacts
+        # Move all files to root
+        mv artifacts/* . || true
+        rmdir artifacts || true
 
     # Create Release
     - name: Create Release
