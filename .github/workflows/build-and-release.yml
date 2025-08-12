@@ -31,19 +31,19 @@ jobs:
             arch: arm64
             build_flags: ""
           
-          # FreeBSD builds (temporarily disabled due to connection issues)
-          # - os: ubuntu-latest
-          #   name: freebsd-x64
-          #   arch: x64
-          #   use_cross: true
-          #   target: freebsd
-          #   build_flags: ""
-          # - os: ubuntu-latest
-          #   name: freebsd-x86
-          #   arch: x86
-          #   use_cross: true
-          #   target: freebsd
-          #   build_flags: "BUILD_32BIT=1"
+          # FreeBSD builds
+          - os: ubuntu-latest
+            name: freebsd-x64
+            arch: x64
+            use_cross: true
+            target: freebsd
+            build_flags: ""
+          - os: ubuntu-latest
+            name: freebsd-x86
+            arch: x86
+            use_cross: true
+            target: freebsd
+            build_flags: "BUILD_32BIT=1"
 
     runs-on: ${{ matrix.os }}
     
@@ -58,18 +58,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libcrypt-dev:i386
 
-    # FreeBSD build temporarily disabled due to connection issues
-    # - name: Build for FreeBSD
-    #   if: matrix.use_cross && matrix.target == 'freebsd'
-    #   uses: cross-platform-actions/action@v0.25.0
-    #   with:
-    #     operating_system: freebsd
-    #     version: '14.1'
-    #     run: |
-    #       pkg install -y gmake gcc
-    #       gmake clean
-    #       gmake RELEASE=1 ${{ matrix.build_flags }}
-    #       mv miniftpd miniftpd-${{ matrix.name }}
+    # Build for FreeBSD using cross-compilation
+    - name: Build for FreeBSD
+      if: matrix.use_cross && matrix.target == 'freebsd'
+      uses: cross-platform-actions/action@v0.25.0
+      with:
+        operating_system: freebsd
+        version: '14.1'
+        run: |
+          pkg install -y gmake gcc
+          gmake clean
+          gmake RELEASE=1 ${{ matrix.build_flags }}
+          mv miniftpd miniftpd-${{ matrix.name }}
 
     # Regular build for Linux and macOS
     - name: Build
@@ -81,10 +81,12 @@ jobs:
 
     # Upload artifacts
     - name: Upload artifact
+      if: always() && (success() || failure())
       uses: actions/upload-artifact@v4
       with:
         name: miniftpd-${{ matrix.name }}
         path: miniftpd-${{ matrix.name }}
+        if-no-files-found: warn
 
   release:
     needs: build
@@ -101,47 +103,45 @@ jobs:
       with:
         path: artifacts
 
-    # Create checksums and prepare files
-    - name: Create checksums and prepare files
+    # Download and organize all artifacts
+    - name: Download and organize artifacts
       run: |
         echo "=== Listing all downloaded artifacts ==="
-        find artifacts -type f
+        find artifacts -type f -ls
         
-        echo "=== Moving files and creating checksums ==="
-        cd artifacts
-        # Move all files from subdirectories to current directory
-        find . -name "miniftpd-*" -type f -exec mv {} . \;
+        echo "=== Organizing files ==="
+        mkdir -p release_files
         
-        # List files in current directory
-        echo "Files in artifacts directory:"
-        ls -la miniftpd-* || echo "No miniftpd files found"
+        # Find and copy all binary files
+        find artifacts -name "miniftpd-*" -type f | while read file; do
+          echo "Found binary: $file"
+          filename=$(basename "$file")
+          echo "Copying to release_files/$filename"
+          cp "$file" "release_files/$filename"
+          chmod +x "release_files/$filename"
+        done
         
-        # Create checksums for all binary files
-        for file in miniftpd-*; do
+        echo "=== Files in release_files directory ==="
+        ls -la release_files/ || echo "No files found"
+        
+        echo "=== Creating checksums ==="
+        cd release_files
+        for file in *; do
           if [ -f "$file" ]; then
             echo "Creating checksum for $file"
             sha256sum "$file" > "$file.sha256"
-            # Make files executable
-            chmod +x "$file"
           fi
         done
         
+        echo "=== Final release files ==="
+        ls -la
         cd ..
-        # Move all files to root
-        echo "Moving files to root directory"
-        mv artifacts/miniftpd-* . 2>/dev/null || true
-        mv artifacts/*.sha256 . 2>/dev/null || true
-        
-        echo "=== Final file list ==="
-        ls -la miniftpd-* *.sha256 || echo "No files to upload"
 
     # Create Release
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          miniftpd-*
-          *.sha256
+        files: release_files/*
         generate_release_notes: true
         draft: false
         prerelease: false
