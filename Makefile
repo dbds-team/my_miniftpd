@@ -24,12 +24,7 @@ ifeq ($(UNAME_S),Darwin)
     # macOS specific flags
     CFLAGS += -D_DARWIN_C_SOURCE
     # Don't use static linking on macOS
-    # Check if running on Apple Silicon
-    ifeq ($(UNAME_M),arm64)
-        CFLAGS += -arch arm64
-    else
-        CFLAGS += -arch x86_64
-    endif
+    # Let the compiler choose the appropriate architecture automatically
 endif
 
 # BSD variants
