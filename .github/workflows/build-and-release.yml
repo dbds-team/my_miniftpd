@@ -73,8 +73,8 @@ jobs:
           echo "Building on FreeBSD ${{ matrix.freebsd_arch }}"
           uname -a
           
-          # Install dependencies
-          pkg install -y gmake gcc
+          # Install dependencies with sudo
+          sudo pkg install -y gmake gcc
           
           # Build the project
           gmake clean
