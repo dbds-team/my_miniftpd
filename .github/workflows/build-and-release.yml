@@ -1,0 +1,128 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # 只在推送v开头的标签时触发
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            name: linux-x64
+            arch: x64
+            build_flags: ""
+          - os: ubuntu-latest
+            name: linux-x86
+            arch: x86
+            build_flags: "BUILD_32BIT=1"
+          
+          # macOS builds
+          - os: macos-latest
+            name: macos-x64
+            arch: x64
+            build_flags: ""
+          - os: macos-14  # M1/M2 runners
+            name: macos-arm64
+            arch: arm64
+            build_flags: ""
+          
+          # FreeBSD build
+          - os: ubuntu-latest
+            name: freebsd-x64
+            arch: x64
+            use_cross: true
+            target: freebsd
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Setup 32-bit environment on Ubuntu
+    - name: Setup 32-bit environment
+      if: matrix.arch == 'x86' && runner.os == 'Linux'
+      run: |
+        sudo dpkg --add-architecture i386
+        sudo apt-get update
+        sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386
+
+    # Build for FreeBSD using cross-compilation
+    - name: Build for FreeBSD
+      if: matrix.use_cross && matrix.target == 'freebsd'
+      uses: cross-platform-actions/action@v0
+      with:
+        operating_system: freebsd
+        version: '14.0'
+        run: |
+          pkg install -y gmake gcc
+          gmake clean
+          gmake
+          mv miniftpd miniftpd-${{ matrix.name }}
+
+    # Regular build for Linux and macOS
+    - name: Build
+      if: "!matrix.use_cross"
+      run: |
+        make clean
+        make ${{ matrix.build_flags }}
+        mv miniftpd miniftpd-${{ matrix.name }}
+
+    # Upload artifacts
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: miniftpd-${{ matrix.name }}
+        path: miniftpd-${{ matrix.name }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Download all artifacts
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    # Create checksums
+    - name: Create checksums
+      run: |
+        cd artifacts
+        for dir in */; do
+          if [ -d "$dir" ]; then
+            cd "$dir"
+            for file in *; do
+              if [ -f "$file" ]; then
+                sha256sum "$file" > "$file.sha256"
+                mv "$file" "$file.sha256" ../
+              fi
+            done
+            cd ..
+          fi
+        done
+        cd ..
+        mv artifacts/* .
+        rmdir artifacts/*/
+        rmdir artifacts
+
+    # Create Release
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          miniftpd-*
+          *.sha256
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
