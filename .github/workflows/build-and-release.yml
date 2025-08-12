@@ -31,12 +31,12 @@ jobs:
             arch: arm64
             build_flags: ""
           
-          # FreeBSD build (temporarily disabled due to action issues)
-          # - os: ubuntu-latest
-          #   name: freebsd-x64
-          #   arch: x64
-          #   use_cross: true
-          #   target: freebsd
+          # FreeBSD build
+          - os: ubuntu-latest
+            name: freebsd-x64
+            arch: x64
+            use_cross: true
+            target: freebsd
 
     runs-on: ${{ matrix.os }}
     
@@ -51,18 +51,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libcrypt-dev:i386
 
-    # FreeBSD build temporarily disabled
-    # - name: Build for FreeBSD
-    #   if: matrix.use_cross && matrix.target == 'freebsd'
-    #   uses: cross-platform-actions/action@v0.23.0
-    #   with:
-    #     operating_system: freebsd
-    #     version: '14.0'
-    #     run: |
-    #       pkg install -y gmake gcc
-    #       gmake clean
-    #       gmake RELEASE=1
-    #       mv miniftpd miniftpd-${{ matrix.name }}
+    # Build for FreeBSD using cross-compilation
+    - name: Build for FreeBSD
+      if: matrix.use_cross && matrix.target == 'freebsd'
+      uses: cross-platform-actions/action@v0.23.0
+      with:
+        operating_system: freebsd
+        version: '14.0'
+        run: |
+          pkg install -y gmake gcc
+          gmake clean
+          gmake RELEASE=1
+          mv miniftpd miniftpd-${{ matrix.name }}
 
     # Regular build for Linux and macOS
     - name: Build
@@ -94,24 +94,39 @@ jobs:
       with:
         path: artifacts
 
-    # Create checksums
-    - name: Create checksums
+    # Create checksums and prepare files
+    - name: Create checksums and prepare files
       run: |
+        echo "=== Listing all downloaded artifacts ==="
+        find artifacts -type f
+        
+        echo "=== Moving files and creating checksums ==="
         cd artifacts
         # Move all files from subdirectories to current directory
         find . -name "miniftpd-*" -type f -exec mv {} . \;
-        # Remove empty subdirectories
-        find . -type d -empty -delete
+        
+        # List files in current directory
+        echo "Files in artifacts directory:"
+        ls -la miniftpd-* || echo "No miniftpd files found"
+        
         # Create checksums for all binary files
         for file in miniftpd-*; do
           if [ -f "$file" ]; then
+            echo "Creating checksum for $file"
             sha256sum "$file" > "$file.sha256"
+            # Make files executable
+            chmod +x "$file"
           fi
         done
+        
         cd ..
         # Move all files to root
-        mv artifacts/* . || true
-        rmdir artifacts || true
+        echo "Moving files to root directory"
+        mv artifacts/miniftpd-* . 2>/dev/null || true
+        mv artifacts/*.sha256 . 2>/dev/null || true
+        
+        echo "=== Final file list ==="
+        ls -la miniftpd-* *.sha256 || echo "No files to upload"
 
     # Create Release
     - name: Create Release
