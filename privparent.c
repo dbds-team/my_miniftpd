@@ -8,10 +8,12 @@ static void privop_pasv_active(session_t *sess);
 static void privop_pasv_listen(session_t *sess);
 static void privop_pasv_accept(session_t *sess);
 
+#ifdef __linux__
 int capset(cap_user_header_t hdrp, const cap_user_data_t datap)
 {
 	return syscall(__NR_capset, hdrp, datap);
 }
+#endif
 
 void minimize_privilege(void)
 {
@@ -24,7 +26,7 @@ void minimize_privilege(void)
 	if (seteuid(pw->pw_uid) < 0)
 		ERR_EXIT("seteuid");
 
-
+#ifdef __linux__
 	struct __user_cap_header_struct cap_header;
 	struct __user_cap_data_struct cap_data;
 
@@ -41,6 +43,7 @@ void minimize_privilege(void)
 	cap_data.inheritable = 0;
 
 	capset(&cap_header, &cap_data);
+#endif
 }
 
 void handle_parent(session_t *sess)

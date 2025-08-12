@@ -10,13 +10,14 @@ CC = gcc
 # Base flags
 CFLAGS = -Wall -g
 LDFLAGS =
-LIBS = -lcrypt
+LIBS =
 
 # OS-specific settings
 ifeq ($(UNAME_S),Linux)
     CFLAGS += -D_GNU_SOURCE
     # Static linking only on Linux for better portability
     LDFLAGS += -static
+    LIBS += -lcrypt
 endif
 
 ifeq ($(UNAME_S),Darwin)

@@ -5,8 +5,6 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <pwd.h>
-#include <shadow.h>
-#include <crypt.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
@@ -14,9 +12,14 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+
+#ifdef __linux__
+#include <shadow.h>
+#include <crypt.h>
 #include <linux/capability.h>
 #include <sys/syscall.h>
 #include <sys/sendfile.h>
+#endif
 
 #include <time.h>
 #include <sys/stat.h>
