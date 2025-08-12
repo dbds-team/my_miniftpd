@@ -314,8 +314,13 @@ int list_common(session_t *sess, int detail)
 			if (S_ISLNK(sbuf.st_mode))
 			{
 				char tmp[1024] = {0};
-				readlink(dt->d_name, tmp, sizeof(tmp));
-				off += sprintf(buf + off, "%s -> %s\r\n", dt->d_name, tmp);
+				ssize_t len = readlink(dt->d_name, tmp, sizeof(tmp) - 1);
+				if (len > 0) {
+					tmp[len] = '\0';
+					off += sprintf(buf + off, "%s -> %s\r\n", dt->d_name, tmp);
+				} else {
+					off += sprintf(buf + off, "%s\r\n", dt->d_name);
+				}
 			}
 			else
 			{

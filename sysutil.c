@@ -506,8 +506,9 @@ int recv_fd(const int sock_fd)
 
 const char* statbuf_get_perms(struct stat *sbuf)
 {
-	static char perms[] = "----------";
-	perms[0] = '?';
+	static char perms[11] = "----------";
+	// Reset the string for each call
+	strcpy(perms, "----------");
 
 	mode_t mode = sbuf->st_mode;
 	switch (mode & S_IFMT)
@@ -599,7 +600,7 @@ const char* statbuf_get_date(struct stat *sbuf)
 		p_date_format = "%b %e  %Y";
 	}
 
-	struct tm* p_tm = localtime(&local_time);
+	struct tm* p_tm = localtime(&sbuf->st_mtime);
 	strftime(datebuf, sizeof(datebuf), p_date_format, p_tm);
 
 	return datebuf;
