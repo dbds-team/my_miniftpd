@@ -35,7 +35,7 @@ unsigned int hash_func(unsigned int buckets, void *key);
 unsigned int handle_ip_count(void *ip);
 void drop_ip_count(void *ip);
 
-int main(void)
+int main(int argc, char *argv[])
 {
 	/*
 	list_common();
@@ -70,11 +70,19 @@ int main(void)
 	printf("n=%d\n", n);
 	*/
 
+	// Check command line arguments
+	int debug_mode = 0;
+	if (argc > 1 && strcmp(argv[1], "-d") == 0) {
+		debug_mode = 1;
+		printf("Running in debug mode (no daemon)\n");
+	}
 	
 
 	parseconf_load_file(MINIFTP_CONF);
 	/*必须放到LoadFile的后面---守候进程*/
-	daemon(0, 0);
+	if (!debug_mode) {
+		daemon(0, 0);
+	}
 
 	printf("tunable_pasv_enable=%d\n", tunable_pasv_enable);
 	printf("tunable_port_enable=%d\n", tunable_port_enable);
