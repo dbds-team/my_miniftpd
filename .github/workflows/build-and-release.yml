@@ -64,7 +64,7 @@ jobs:
       uses: cross-platform-actions/action@v0.26.0
       with:
         operating_system: freebsd
-        version: '14.3'
+        version: '14.1'
         architecture: ${{ matrix.freebsd_arch }}
         shell: bash
         memory: 4G
