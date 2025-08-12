@@ -38,12 +38,8 @@ jobs:
             use_freebsd: true
             freebsd_arch: x86-64
             build_flags: ""
-          - os: ubuntu-latest
-            name: freebsd-x86
-            arch: x86  
-            use_freebsd: true
-            freebsd_arch: x86-64
-            build_flags: "BUILD_32BIT=1"
+          # FreeBSD 32-bit disabled due to library compatibility issues
+          # Modern FreeBSD systems are predominantly 64-bit
 
     runs-on: ${{ matrix.os }}
     
