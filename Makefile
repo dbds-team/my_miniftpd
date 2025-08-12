@@ -25,10 +25,8 @@ endif
 ifeq ($(UNAME_S),Darwin)
     # macOS specific flags
     CFLAGS += -D_DARWIN_C_SOURCE
-    # Static linking not recommended on macOS, but try partial static
-    ifndef NO_STATIC
-        LDFLAGS += -static-libgcc
-    endif
+    # macOS doesn't support static linking well, disable by default
+    # Use NO_STATIC=1 is not needed on macOS
 endif
 
 # BSD variants
