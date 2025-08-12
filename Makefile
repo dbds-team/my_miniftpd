@@ -4,8 +4,8 @@
 UNAME_S := $(shell uname -s)
 UNAME_M := $(shell uname -m)
 
-# Set compiler
-CC = gcc
+# Set compiler (can be overridden for cross-compilation)
+CC ?= gcc
 
 # Base flags
 CFLAGS = -Wall -g

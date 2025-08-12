@@ -31,13 +31,19 @@ jobs:
             arch: arm64
             build_flags: ""
           
-          # FreeBSD builds - trying different approach
+          # FreeBSD builds using cross-compilation
           - os: ubuntu-latest
             name: freebsd-x64
             arch: x64
-            use_cross: true
-            target: freebsd
+            use_freebsd_cross: true
+            target_arch: x86_64
             build_flags: ""
+          - os: ubuntu-latest
+            name: freebsd-x86
+            arch: x86
+            use_freebsd_cross: true
+            target_arch: i686
+            build_flags: "BUILD_32BIT=1"
 
     runs-on: ${{ matrix.os }}
     
@@ -52,57 +58,81 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libcrypt-dev:i386
 
-    # Build for FreeBSD - trying multiple approaches
-    - name: Build for FreeBSD (attempt 1 - latest)
-      if: matrix.use_cross && matrix.target == 'freebsd'
-      continue-on-error: true
-      id: freebsd_build_1
-      uses: cross-platform-actions/action@v0.25.0
-      with:
-        operating_system: freebsd
-        version: '14.1'
-        memory: 4G
-        cpu_count: 2
-        sync_files: runner-to-vm
-        run: |
-          pkg install -y gmake gcc
-          gmake clean
-          gmake RELEASE=1 ${{ matrix.build_flags }}
-          mv miniftpd miniftpd-${{ matrix.name }}
+    # Setup FreeBSD cross-compilation toolchain
+    - name: Setup FreeBSD cross-compilation
+      if: matrix.use_freebsd_cross
+      run: |
+        echo "Setting up FreeBSD cross-compilation for ${{ matrix.target_arch }}"
+        
+        # Install dependencies
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential autoconf automake libtool \
+          flex bison gperf help2man libncurses5-dev \
+          texinfo unzip wget curl git cmake ninja-build
+        
+        # Create workspace
+        mkdir -p ~/freebsd-cross
+        cd ~/freebsd-cross
+        
+        # Download and build a simplified FreeBSD cross-compiler
+        # Using a pre-built toolchain approach for faster builds
+        if [ "${{ matrix.target_arch }}" = "x86_64" ]; then
+          TARGET_TRIPLE="x86_64-unknown-freebsd13"
+          FREEBSD_ARCH="amd64"
+        else
+          TARGET_TRIPLE="i686-unknown-freebsd13" 
+          FREEBSD_ARCH="i386"
+        fi
+        
+        echo "TARGET_TRIPLE=$TARGET_TRIPLE" >> $GITHUB_ENV
+        echo "FREEBSD_ARCH=$FREEBSD_ARCH" >> $GITHUB_ENV
+        
+        # Download FreeBSD base system for headers and libs
+        wget -q "https://download.freebsd.org/ftp/releases/amd64/13.2-RELEASE/base.txz" -O base.txz
+        mkdir -p sysroot
+        tar -xf base.txz -C sysroot
+        
+        echo "FREEBSD_SYSROOT=$PWD/sysroot" >> $GITHUB_ENV
+        
+        # Install clang as cross-compiler (supports FreeBSD out of the box)
+        sudo apt-get install -y clang
+        
+        echo "FreeBSD cross-compilation setup complete"
     
-    # Fallback to older version if first attempt fails
-    - name: Build for FreeBSD (attempt 2 - stable)
-      if: matrix.use_cross && matrix.target == 'freebsd' && steps.freebsd_build_1.outcome == 'failure'
-      continue-on-error: true
-      id: freebsd_build_2
-      uses: cross-platform-actions/action@v0.23.0
-      with:
-        operating_system: freebsd
-        version: '13.3'
-        memory: 2G
-        run: |
-          pkg install -y gmake gcc
-          gmake clean
-          gmake RELEASE=1 ${{ matrix.build_flags }}
-          mv miniftpd miniftpd-${{ matrix.name }}
-    
-    # Final fallback with minimal config
-    - name: Build for FreeBSD (attempt 3 - minimal)
-      if: matrix.use_cross && matrix.target == 'freebsd' && steps.freebsd_build_2.outcome == 'failure'
-      continue-on-error: true
-      uses: cross-platform-actions/action@v0.21.1
-      with:
-        operating_system: freebsd
-        version: '13.2'
-        run: |
-          pkg install -y gmake gcc
-          gmake clean
-          gmake RELEASE=1 ${{ matrix.build_flags }}
-          mv miniftpd miniftpd-${{ matrix.name }}
+    # Build for FreeBSD using cross-compilation
+    - name: Build for FreeBSD
+      if: matrix.use_freebsd_cross
+      run: |
+        echo "Building for FreeBSD ${{ matrix.target_arch }}"
+        
+        # Setup cross-compilation environment
+        export CC="clang"
+        export CXX="clang++"
+        export CFLAGS="--target=${{ env.TARGET_TRIPLE }} --sysroot=${{ env.FREEBSD_SYSROOT }} -static"
+        export CXXFLAGS="--target=${{ env.TARGET_TRIPLE }} --sysroot=${{ env.FREEBSD_SYSROOT }} -static"
+        export LDFLAGS="--target=${{ env.TARGET_TRIPLE }} --sysroot=${{ env.FREEBSD_SYSROOT }} -static"
+        
+        if [ "${{ matrix.target_arch }}" = "i686" ]; then
+          export CFLAGS="$CFLAGS -m32"
+          export CXXFLAGS="$CXXFLAGS -m32"
+          export LDFLAGS="$LDFLAGS -m32"
+        fi
+        
+        # Build using our Makefile with FreeBSD-specific settings
+        make clean
+        make CC="$CC" RELEASE=1 ${{ matrix.build_flags }}
+        
+        # Rename binary
+        mv miniftpd miniftpd-${{ matrix.name }}
+        
+        # Verify the binary
+        file miniftpd-${{ matrix.name }}
+        ls -la miniftpd-${{ matrix.name }}
 
     # Regular build for Linux and macOS
     - name: Build
-      if: "!matrix.use_cross"
+      if: "!matrix.use_freebsd_cross"
       run: |
         make clean
         make RELEASE=1 ${{ matrix.build_flags }}
