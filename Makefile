@@ -47,6 +47,14 @@ else ifdef BUILD_64BIT
     LDFLAGS += -m64
 endif
 
+# Release build flags
+ifdef RELEASE
+    CFLAGS += -O2 -DNDEBUG
+    CFLAGS := $(filter-out -g,$(CFLAGS))
+else
+    CFLAGS += -g
+endif
+
 # Binary name
 BIN = miniftpd
 
@@ -72,7 +80,11 @@ clean:
 # Help target
 help:
 	@echo "Build targets:"
-	@echo "  make          - Build for current platform"
+	@echo "  make              - Build for current platform (debug)"
+	@echo "  make RELEASE=1    - Build release version (optimized)"
 	@echo "  make BUILD_32BIT=1 - Build 32-bit binary"
 	@echo "  make BUILD_64BIT=1 - Build 64-bit binary"
-	@echo "  make clean    - Remove build artifacts"
+	@echo "  make clean        - Remove build artifacts"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make RELEASE=1 BUILD_64BIT=1  - Release 64-bit build"

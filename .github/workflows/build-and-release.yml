@@ -48,7 +48,7 @@ jobs:
       run: |
         sudo dpkg --add-architecture i386
         sudo apt-get update
-        sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386
+        sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libcrypt-dev:i386
 
     # Build for FreeBSD using cross-compilation
     - name: Build for FreeBSD
@@ -60,7 +60,7 @@ jobs:
         run: |
           pkg install -y gmake gcc
           gmake clean
-          gmake
+          gmake RELEASE=1
           mv miniftpd miniftpd-${{ matrix.name }}
 
     # Regular build for Linux and macOS
@@ -68,7 +68,7 @@ jobs:
       if: "!matrix.use_cross"
       run: |
         make clean
-        make ${{ matrix.build_flags }}
+        make RELEASE=1 ${{ matrix.build_flags }}
         mv miniftpd miniftpd-${{ matrix.name }}
 
     # Upload artifacts
