@@ -281,27 +281,38 @@ void ftp_lreply(session_t *sess, int status, const char *text)
 
 int list_common(session_t *sess, int detail)
 {
+	printf("DEBUG: list_common called, detail=%d\n", detail);
 	DIR *dir = opendir(".");
 	if (dir == NULL)
 	{
+		printf("DEBUG: opendir failed\n");
 		return 0;
 	}
+	printf("DEBUG: opendir successful\n");
 
 	struct dirent *dt;
 	struct stat sbuf;
+	int file_count = 0;
 	while ((dt = readdir(dir)) != NULL)
 	{
+		printf("DEBUG: processing file: %s\n", dt->d_name);
 		if (lstat(dt->d_name, &sbuf) < 0)
 		{
+			printf("DEBUG: lstat failed for %s\n", dt->d_name);
 			continue;
 		}
 		if (dt->d_name[0] == '.')
 			continue;
 
+		file_count++;
+		printf("DEBUG: file %d: %s\n", file_count, dt->d_name);
+		
 		char buf[1024] = {0};
 		if (detail)
 		{
+			printf("DEBUG: getting perms\n");
 			const char *perms = statbuf_get_perms(&sbuf);
+			printf("DEBUG: perms = %s\n", perms);
 
 			
 			int off = 0;
@@ -309,7 +320,9 @@ int list_common(session_t *sess, int detail)
 			off += sprintf(buf + off, " %3d %-8d %-8d ", sbuf.st_nlink, sbuf.st_uid, sbuf.st_gid);
 			off += sprintf(buf + off, "%8lu ", (unsigned long)sbuf.st_size);
 
+			printf("DEBUG: getting date\n");
 			const char *datebuf = statbuf_get_date(&sbuf);
+			printf("DEBUG: date = %s\n", datebuf);
 			off += sprintf(buf + off, "%s ", datebuf);
 			if (S_ISLNK(sbuf.st_mode))
 			{
@@ -332,10 +345,17 @@ int list_common(session_t *sess, int detail)
 			sprintf(buf, "%s\r\n", dt->d_name);
 		}
 		
+		printf("DEBUG: sending data: %d bytes\n", (int)strlen(buf));
 		//printf("%s", buf);
-		writen(sess->data_fd, buf, strlen(buf));
+		int ret = writen(sess->data_fd, buf, strlen(buf));
+		if (ret < 0) {
+			printf("DEBUG: writen failed, ret=%d\n", ret);
+			break;
+		}
+		printf("DEBUG: sent successfully\n");
 	}
 
+	printf("DEBUG: processed %d files\n", file_count);
 	closedir(dir);
 
 	return 1;
@@ -1071,16 +1091,22 @@ static void do_appe(session_t *sess)
 
 static void do_list(session_t *sess)
 {
+	printf("DEBUG: do_list called\n");
 	// 创建数据连接
 	if (get_transfer_fd(sess) == 0)
 	{
+		printf("DEBUG: get_transfer_fd failed\n");
 		return;
 	}
+	printf("DEBUG: data_fd = %d\n", sess->data_fd);
+	
 	// 150
 	ftp_reply(sess, FTP_DATACONN, "Here comes the directory listing.");
 
 	// 传输列表
-	list_common(sess, 1);
+	int ret = list_common(sess, 1);
+	printf("DEBUG: list_common returned %d\n", ret);
+	
 	// 关闭数据套接字
 	close(sess->data_fd);
 	sess->data_fd = -1;
