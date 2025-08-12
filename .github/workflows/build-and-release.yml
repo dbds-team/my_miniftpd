@@ -31,20 +31,13 @@ jobs:
             arch: arm64
             build_flags: ""
           
-          # FreeBSD builds (disabled due to SSH connection issues with cross-platform-actions)
-          # Will implement alternative solution for BSD builds
-          # - os: ubuntu-latest
-          #   name: freebsd-x64
-          #   arch: x64
-          #   use_cross: true
-          #   target: freebsd
-          #   build_flags: ""
-          # - os: ubuntu-latest
-          #   name: freebsd-x86
-          #   arch: x86
-          #   use_cross: true
-          #   target: freebsd
-          #   build_flags: "BUILD_32BIT=1"
+          # FreeBSD builds - trying different approach
+          - os: ubuntu-latest
+            name: freebsd-x64
+            arch: x64
+            use_cross: true
+            target: freebsd
+            build_flags: ""
 
     runs-on: ${{ matrix.os }}
     
@@ -59,18 +52,53 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libcrypt-dev:i386
 
-    # FreeBSD build disabled due to SSH connection issues
-    # - name: Build for FreeBSD
-    #   if: matrix.use_cross && matrix.target == 'freebsd'
-    #   uses: cross-platform-actions/action@v0.25.0
-    #   with:
-    #     operating_system: freebsd
-    #     version: '14.1'
-    #     run: |
-    #       pkg install -y gmake gcc
-    #       gmake clean
-    #       gmake RELEASE=1 ${{ matrix.build_flags }}
-    #       mv miniftpd miniftpd-${{ matrix.name }}
+    # Build for FreeBSD - trying multiple approaches
+    - name: Build for FreeBSD (attempt 1 - latest)
+      if: matrix.use_cross && matrix.target == 'freebsd'
+      continue-on-error: true
+      id: freebsd_build_1
+      uses: cross-platform-actions/action@v0.25.0
+      with:
+        operating_system: freebsd
+        version: '14.1'
+        memory: 4G
+        cpu_count: 2
+        sync_files: runner-to-vm
+        run: |
+          pkg install -y gmake gcc
+          gmake clean
+          gmake RELEASE=1 ${{ matrix.build_flags }}
+          mv miniftpd miniftpd-${{ matrix.name }}
+    
+    # Fallback to older version if first attempt fails
+    - name: Build for FreeBSD (attempt 2 - stable)
+      if: matrix.use_cross && matrix.target == 'freebsd' && steps.freebsd_build_1.outcome == 'failure'
+      continue-on-error: true
+      id: freebsd_build_2
+      uses: cross-platform-actions/action@v0.23.0
+      with:
+        operating_system: freebsd
+        version: '13.3'
+        memory: 2G
+        run: |
+          pkg install -y gmake gcc
+          gmake clean
+          gmake RELEASE=1 ${{ matrix.build_flags }}
+          mv miniftpd miniftpd-${{ matrix.name }}
+    
+    # Final fallback with minimal config
+    - name: Build for FreeBSD (attempt 3 - minimal)
+      if: matrix.use_cross && matrix.target == 'freebsd' && steps.freebsd_build_2.outcome == 'failure'
+      continue-on-error: true
+      uses: cross-platform-actions/action@v0.21.1
+      with:
+        operating_system: freebsd
+        version: '13.2'
+        run: |
+          pkg install -y gmake gcc
+          gmake clean
+          gmake RELEASE=1 ${{ matrix.build_flags }}
+          mv miniftpd miniftpd-${{ matrix.name }}
 
     # Regular build for Linux and macOS
     - name: Build
