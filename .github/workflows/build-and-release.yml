@@ -31,19 +31,20 @@ jobs:
             arch: arm64
             build_flags: ""
           
-          # FreeBSD builds
-          - os: ubuntu-latest
-            name: freebsd-x64
-            arch: x64
-            use_cross: true
-            target: freebsd
-            build_flags: ""
-          - os: ubuntu-latest
-            name: freebsd-x86
-            arch: x86
-            use_cross: true
-            target: freebsd
-            build_flags: "BUILD_32BIT=1"
+          # FreeBSD builds (disabled due to SSH connection issues with cross-platform-actions)
+          # Will implement alternative solution for BSD builds
+          # - os: ubuntu-latest
+          #   name: freebsd-x64
+          #   arch: x64
+          #   use_cross: true
+          #   target: freebsd
+          #   build_flags: ""
+          # - os: ubuntu-latest
+          #   name: freebsd-x86
+          #   arch: x86
+          #   use_cross: true
+          #   target: freebsd
+          #   build_flags: "BUILD_32BIT=1"
 
     runs-on: ${{ matrix.os }}
     
@@ -58,18 +59,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libcrypt-dev:i386
 
-    # Build for FreeBSD using cross-compilation
-    - name: Build for FreeBSD
-      if: matrix.use_cross && matrix.target == 'freebsd'
-      uses: cross-platform-actions/action@v0.25.0
-      with:
-        operating_system: freebsd
-        version: '14.1'
-        run: |
-          pkg install -y gmake gcc
-          gmake clean
-          gmake RELEASE=1 ${{ matrix.build_flags }}
-          mv miniftpd miniftpd-${{ matrix.name }}
+    # FreeBSD build disabled due to SSH connection issues
+    # - name: Build for FreeBSD
+    #   if: matrix.use_cross && matrix.target == 'freebsd'
+    #   uses: cross-platform-actions/action@v0.25.0
+    #   with:
+    #     operating_system: freebsd
+    #     version: '14.1'
+    #     run: |
+    #       pkg install -y gmake gcc
+    #       gmake clean
+    #       gmake RELEASE=1 ${{ matrix.build_flags }}
+    #       mv miniftpd miniftpd-${{ matrix.name }}
 
     # Regular build for Linux and macOS
     - name: Build
