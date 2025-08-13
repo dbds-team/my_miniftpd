@@ -137,9 +137,33 @@ static void privop_pasv_active(session_t *sess)
 static void privop_pasv_listen(session_t *sess)
 {
 	char ip[16] = {0};
-	getlocalip(ip);
-
-	sess->pasv_listen_fd = tcp_server(ip, 0);
+	int bind_success = 0;
+	
+	// First try getlocalip (works on most Linux systems)
+	if (getlocalip(ip) == 0)
+	{
+		sess->pasv_listen_fd = tcp_server(ip, 0);
+		if (sess->pasv_listen_fd >= 0)
+		{
+			bind_success = 1;
+		}
+		else
+		{
+			// Log the error for debugging
+			printf("PASV: Failed to bind to %s, trying fallback\n", ip);
+		}
+	}
+	
+	// If getlocalip failed or bind failed, try binding to all interfaces
+	if (!bind_success)
+	{
+		sess->pasv_listen_fd = tcp_server(NULL, 0);
+		if (sess->pasv_listen_fd < 0)
+		{
+			ERR_EXIT("tcp_server for PASV");
+		}
+	}
+	
 	struct sockaddr_in addr;
 	socklen_t addrlen = sizeof(addr);
 	if (getsockname(sess->pasv_listen_fd, (struct sockaddr *)&addr, &addrlen) < 0)

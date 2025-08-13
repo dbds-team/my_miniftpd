@@ -844,19 +844,21 @@ static void do_pasv(session_t *sess)
 	//Entering Passive Mode (192,168,244,100,101,46).
 
 	char ip[16] = {0};
-	getlocalip(ip);
-
-/*
-	sess->pasv_listen_fd = tcp_server(ip, 0);
+	
+	// Get the actual local IP from the control connection
+	// This is more reliable than getlocalip() especially on FreeBSD
 	struct sockaddr_in addr;
 	socklen_t addrlen = sizeof(addr);
-	if (getsockname(sess->pasv_listen_fd, (struct sockaddr *)&addr, &addrlen) < 0)
+	if (getsockname(sess->ctrl_fd, (struct sockaddr *)&addr, &addrlen) < 0)
 	{
-		ERR_EXIT("getsockname");
+		// Fallback to getlocalip if getsockname fails
+		getlocalip(ip);
 	}
-
-	unsigned short port = ntohs(addr.sin_port);
-	*/
+	else
+	{
+		// Use the actual IP address from the control connection
+		strcpy(ip, inet_ntoa(addr.sin_addr));
+	}
 
 	priv_sock_send_cmd(sess->child_fd, PRIV_SOCK_PASV_LISTEN);
 	unsigned short port = (int)priv_sock_get_int(sess->child_fd);
